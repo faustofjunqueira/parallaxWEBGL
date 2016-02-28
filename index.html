@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Parallax Mapping</title>
+
+  <script type="text/javascript" src="common/webgl-utils.js"></script>
+  <script type="text/javascript" src="common/initShaders.js"></script>
+  <script type="text/javascript" src="common/MV.js"></script>
+
+  <style type="text/css">
+    #gl-canvas {
+      padding: 5px;
+      border-width: 1px;
+      border-style: solid;
+      border-color: #31708F;
+      display: block;
+    }
+
+    .left{
+      float: left;
+    }
+
+    .right{
+      float: right;
+    }
+
+    td{
+      border-top-style: solid;
+      border-top-width: 1px;
+      border-bottom-style: solid;
+      border-bottom-width: 1px;
+    }
+
+  </style>
+
+  </head>
+  <body>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+
+  attribute  vec4 vPosition;
+  attribute  vec4 vColor;
+  varying vec4 fColor;
+
+  uniform mat4 transformations;
+  uniform mat4 modelview;
+  uniform mat4 pespective;
+
+  void main() 
+  {
+    fColor = vColor;
+    gl_Position = pespective * modelview /** transformations*/ * vPosition;
+  } 
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+  precision mediump float;
+  varying vec4 fColor;
+
+  void
+  main()
+  {
+    gl_FragColor = fColor;
+  }
+</script>
+
+<div class="left">
+  <canvas id="gl-canvas" width="600" height="600">
+    Oops ... your browser doesn't support the HTML5 canvas element
+  </canvas>
+</div>
+
+<table class="right" style="width: 150px">
+  <thread>
+    <tr>
+      <th colspan="3">Camera</th>
+    </tr>
+    <tr>
+      <th>-</th>
+      <th>Eixo</th>
+      <th>+</th>
+    </tr>
+  </thread>
+  <tbody>
+    <tr>
+      <td>A</td>
+      <td><b>X</b></td>
+      <td>D</td>
+    </tr>
+    <tr>
+      <td>Q</td>
+      <td><b>Y</b></td>
+      <td>E</td>
+    </tr>
+    <tr>
+      <td>W</td>
+      <td><b>Z</b></td>
+      <td>S</td>
+    </tr>
+  </tbody>
+</table>
+
+<script type="text/javascript" src="stack.js"></script>
+<script type="text/javascript" src="form.js"></script>
+<script type="text/javascript" src="pespective.js"></script>
+<script type="text/javascript" src="view.js"></script>
+<script type="text/javascript" src="program.js"></script>
+
+
+  </body>
+</html>
