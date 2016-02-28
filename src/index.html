@@ -1,0 +1,262 @@
+
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<title>Texture Mapping - Bump Maps</title>
+
+<script type="text/javascript" src="js/Stats.js"></script>
+<script type="text/javascript" src="js/Three.js"></script>
+
+<script id="vertexShader" type="x-shader/x-fragment">
+  
+  uniform vec3 LightSource;
+  
+  attribute vec4 tangent;
+
+  varying vec2 vUv;
+  varying vec3 vPosition;
+  
+  varying vec3 vNormal;
+  varying vec3 vTangent;
+  varying vec3 vBinormal;
+  
+  varying vec3 tsPosition;
+  varying vec3 tsCameraPosition;
+  varying vec3 tsLightSource;
+  
+  void main( void ) {
+    
+    vUv = uv;
+    vPosition = position;
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(vPosition, 1.0);
+    
+    vNormal = normalize( normal );
+    vTangent = normalize( tangent.xyz );
+    vBinormal = normalize( cross( vNormal, vTangent ) * tangent.w );
+    
+    mat3 TBNMatrix = mat3(vTangent, vBinormal, vNormal);
+    
+    tsPosition = position * TBNMatrix;
+    tsCameraPosition = cameraPosition * TBNMatrix;
+    tsLightSource = LightSource * TBNMatrix;
+    
+  }
+  
+</script>
+
+<script id="fragmentShader" type="x-shader/x-vertex">
+  
+  uniform sampler2D base;
+  uniform sampler2D map;
+  
+  uniform vec3 ambientColor;
+  uniform vec3 diffuseColor;
+  uniform vec3 specularColor;
+  uniform float shininess;
+  uniform vec2 scaleBias;
+  
+  varying vec3 vNormal;
+  varying vec3 vTangent;
+  varying vec3 vBinormal;
+  
+  varying vec3 vPosition;
+  varying vec2 vUv;
+  
+  varying vec3 tsPosition;
+  varying vec3 tsCameraPosition;
+  varying vec3 tsLightSource;
+  
+  void main()
+  {
+  
+    float height = texture2D(map, vUv).a;
+    float v = height * scaleBias.r - scaleBias.g;
+
+    vec3 eye = normalize(tsCameraPosition);
+
+    vec2 newCoords = vUv + (eye.xy * v);
+    
+    vec3 color = texture2D(base, newCoords).rgb; // default color 
+    vec3 normal = texture2D(map, newCoords).rgb * 2.0 - 1.0;
+    
+    
+    vec3 viewVector = normalize(tsCameraPosition - tsPosition);
+    vec3 lightVector = normalize(tsLightSource - tsPosition);
+        
+          float nxDir = max(0.0, dot(normal, lightVector));
+          vec3 ambient = ambientColor * color;
+    
+          float specularPower = 0.0;
+          if(nxDir != 0.0)
+          {
+            vec3 halfVector = normalize(lightVector + viewVector);
+      float nxHalf = max(0.0, dot(normal, halfVector));
+      specularPower = pow(nxHalf, shininess * 100.0);
+          }
+          vec3 specular = specularColor * specularPower;
+    
+          gl_FragColor = vec4(ambient + (diffuseColor * nxDir * color) + specular, 1.0);
+    
+  }
+
+</script>
+
+<script type="text/javascript">
+
+// http://paulirish.com/2011/requestanimationframe-for-smart-animating/
+// shim layer with setTimeout fallback
+window['requestAnimFrame'] = (function(){
+  return  window.requestAnimationFrame       || 
+          window.webkitRequestAnimationFrame || 
+          window.mozRequestAnimationFrame    || 
+          window.oRequestAnimationFrame      || 
+          window.msRequestAnimationFrame     || 
+          function(/* function */ callback, /* DOMElement */ element){
+            window.setTimeout(callback, 1000 / 60);
+          };
+})();
+
+function Degrees2Radians(degrees) {
+  return degrees * (Math.PI / 180)
+};
+
+var settings = {
+  ambientColor: { x: .4, y: .3, z: .2 },
+  diffuseColor: { x: .6, y: .6, z: .6 },
+  specularColor: { x: .6, y: .65, z: .8 },
+  shininess: 5,
+  scaleBias: { x: .02, y: .01 }// x=scale, y=bias
+};
+
+window.onload = function() {
+  
+  var view_width = window.innerWidth;
+  var view_height = window.innerHeight;
+  
+  var renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setSize(view_width, view_height);
+  document.getElementById('viewport').appendChild(renderer.domElement);
+  
+  renderer.domElement.onmousemove = function(e) {
+    camera.position.x = (e.clientX / view_width) * 20 - 10;
+    camera.position.y = (-e.clientY / view_height) * 20 + 10;
+  };
+  
+  var projector = new THREE.Projector();
+  
+  var scene = new THREE.Scene();
+  
+  var camera = new THREE.Camera(
+    35,
+    view_width / view_height,
+    1,
+    10000
+  );
+  camera.position.set(0, 0, 15);
+  
+  var textures = {
+    lion: THREE.ImageUtils.loadTexture( 'lion.png' ),
+    lion_bumpnormal: THREE.ImageUtils.loadTexture( 'lion-bumpnormal.png' ),
+  };
+  
+  var plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.MeshShaderMaterial({
+      uniforms: {
+        base: { type: 't', value: 0, texture: textures.lion },
+        map: { type: 't', value: 1, texture: textures.lion_bumpnormal },
+                
+        LightSource: { type: 'v3', value: { x: -1 , y: 1, z: 2 } },
+        ambientColor: { type: 'v3', value: settings.ambientColor },
+        diffuseColor: { type: 'v3', value: settings.diffuseColor },
+        specularColor: { type: 'v3', value: settings.specularColor },
+        shininess: { type: 'f', value: settings.shininess },
+        scaleBias: { type: 'v2', value: settings.scaleBias }
+      },
+      vertexShader: document.getElementById( 'vertexShader' ).textContent,
+      fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+    })
+  );
+  window.planeMaterial = plane.materials[0];
+  plane.geometry.computeVertexNormals();
+  plane.geometry.computeTangents();
+  scene.addChild(plane);
+  
+  
+  var render = function render() {
+    renderer.render(scene, camera);
+  };
+  
+  var main = function main() {
+    
+    window.planeMaterial.uniforms.shininess.value = settings.shininess;
+    render();
+    stats.update();
+    window.requestAnimFrame(main);
+    
+  };
+  
+  var stats = new Stats();
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.top = '0';
+  stats.domElement.style.zIndex = 100;
+  document.body.appendChild(stats.domElement);
+  
+  requestAnimFrame(main);
+}
+</script>
+
+<style type="text/css">
+  html, body, div {
+    margin: 0;
+    padding: 0;
+  }
+  
+  #viewport {
+    height: 100%;
+    width: 100%;
+  }
+  
+  #settings {
+    position: absolute;
+    top: 50px;
+    background-color: #DDD;
+    z-index: 1;
+    font-size: 8pt;
+    padding: 7px;
+  }
+  #settings input {
+    width: 20px;
+    font-size: 8pt;
+  }
+</style>
+
+</head>
+
+<body>
+  <div id="settings">
+    <strong>Ambient Color:</strong> r <input type="text" value=".4" onchange="settings.ambientColor.x = parseFloat(this.value);" /> g <input type="text" value=".3" onchange="settings.ambientColor.y = parseFloat(this.value);" /> b <input type="text" value=".2" onchange="settings.ambientColor.z = parseFloat(this.value);" />
+    <br />
+    <strong>Diffuse Color:</strong> r <input type="text" value=".6" onchange="settings.diffuseColor.x = parseFloat(this.value);" /> g <input type="text" value=".6" onchange="settings.diffuseColor.y = parseFloat(this.value);" /> b <input type="text" value=".6" onchange="settings.diffuseColor.z = parseFloat(this.value);" />
+    <br />
+    <strong>Specular Color:</strong> r <input type="text" value=".6" onchange="settings.specularColor.x = parseFloat(this.value);" /> g <input type="text" value=".65" onchange="settings.specularColor.y = parseFloat(this.value);" /> b <input type="text" value=".8" onchange="settings.specularColor.z = parseFloat(this.value);" />
+    <br />
+    <strong>Shininess:</strong> <input type="text" value="5" onchange="settings.shininess = parseFloat(this.value);" />
+    <br />
+    <strong>Scale & Bias</strong> s <input type="text" value=".02" onchange="settings.scaleBias.x = parseFloat(this.value);" /> b <input type="text" value=".01" onchange="settings.scaleBias.y = parseFloat(this.value);" />
+    <br /><br />
+    <p>
+      by <a href="http://chandler.prallfamily.com" target="_blank" title="Chandler Prall's blog" alt="Chandler Prall's blog">Chandler Prall</a>
+      <br /><br />
+      image from Morgan McGuire and Max McGuire's<br /><a href="http://graphics.cs.brown.edu/games/SteepParallax/index.html" target="_blank">steep parallax</a> example
+    </p>
+  </div>
+  <div id="viewport"></div>
+
+</body>
+
+</html>
